@@ -1,12 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"github.com/simonmacklin/kubernetes-vault-webhook/pkg/vault"
 	"log"
 	"os"
 	"strings"
-	"github.com/simonmacklin/kubernetes-vault-webhook/pkg/vault"
 )
 
 type arrayFlags []string
@@ -43,7 +44,7 @@ func main() {
 		log.Fatalf("error parsing cmd line flags: %s", err)
 	}
 	sc := getSecrets(kv)
-	writeSecrets(path, sc)
+	writeSecrets(path, "kv", sc)
 }
 
 type mapping struct {
@@ -84,19 +85,33 @@ func getSecrets(m []mapping) map[string]string {
 	return secrets
 }
 
-func writeSecrets(path string, secrets map[string]string) error {
+func writeSecrets(path, format string, secrets map[string]string) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	defer f.Close()
 	if err != nil {
 		return err
 	}
-	for k, v := range secrets {
-		sl := make([]string, len(secrets))
-		sl = append(sl, fmt.Sprintf("%s=%s\n", k, v))
-		qq := strings.Join(sl, "")
+	switch format {
+	case "kv":
+		qq := tokeyValue(secrets)
+		if _, err = f.WriteString(qq); err != nil {
+			return err
+		}
+	case "json":
+		return errors.New("json format is not yet setup")
+	default:
+		qq := tokeyValue(secrets)
 		if _, err = f.WriteString(qq); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func tokeyValue(secrets map[string]string) string {
+	sl := make([]string, len(secrets))
+	for k, v := range secrets {
+		sl = append(sl, fmt.Sprintf("%s=%s\n", k, v))
+	}
+	return strings.Join(sl, "")
 }
