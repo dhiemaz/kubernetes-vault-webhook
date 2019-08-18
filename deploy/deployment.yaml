@@ -1,0 +1,33 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-webhook
+spec:
+  selector:
+    matchLabels:
+      app: vault-webhook
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vault-webhook
+    spec:
+      containers:
+      - name: vault-webhook
+        imagePullPolicy: Always
+        image: simonmacklin/vault-webhook:0.0.1
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "200m"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - name: webhook-certs
+            mountPath: /etc/webhook/certs
+            readOnly: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: vault-webhook-certs

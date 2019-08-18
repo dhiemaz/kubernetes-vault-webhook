@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-webhook-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-webhook-test
+  template:
+    metadata:
+      labels:
+        app: vault-webhook-test
+      annotations:
+        vault.mackers.com/enabled: "true"
+        vault.mackers.com/role: demo
+    spec:
+      containers:
+      - name: vault-webhook-test
+        image:   vault
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: SQLPassword1
+            value: "vault:/passwords:user1"
+          - name: SQLPassword2
+            value: "vault:/passwords:user2"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+    
+     

@@ -1,0 +1,12 @@
+FROM golang as build
+ENV GO111MODULE=on
+COPY . /build
+WORKDIR /build/cmd/cli
+RUN CGO_ENABLED=0 GOOS=linux go build -o vault-cli
+
+FROM alpine:latest  
+WORKDIR /app
+COPY --from=build /build/cmd/cli/vault-cli /app
+ENTRYPOINT ["./vault-cli"]
+
+

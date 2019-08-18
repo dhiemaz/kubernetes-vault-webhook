@@ -1,0 +1,10 @@
+FROM golang as build
+ENV GO111MODULE=on
+COPY . /build
+WORKDIR /build/cmd/webhook
+RUN CGO_ENABLED=0 GOOS=linux go build -o webhook
+
+FROM alpine:latest  
+WORKDIR /app
+COPY --from=build /build/cmd/webhook/webhook /app
+CMD ["./webhook"]
