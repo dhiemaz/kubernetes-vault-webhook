@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&path, "path", "/var/run/secrets/vault/env", "path of the file to write secrets too")
+	flag.StringVar(&path, "path", "/var/run/secrets/vault/secrets", "path of the file to write secrets too")
 	flag.StringVar(&jwt, "jwt", "/var/run/secrets/kubernetes.io/serviceaccount/token", "path of the file to write secrets too")
 	flag.StringVar(&role, "role", "demo", "the vault role to use to grab secrets")
 	flag.Var(&myflags, "secret", "the env variable name, vault path and key")
@@ -71,15 +71,18 @@ func parseKeyValues(flags arrayFlags) ([]mapping, error) {
 func getSecrets(m []mapping) map[string]string {
 
 	secrets := map[string]string{}
+
 	c, err := vault.NewClient(jwt, addr, role)
 	if err != nil {
 		log.Fatalf("error getting a vault client: %s", err)
 	}
 	for _, v := range m {
 		s, err := c.GetSecret(v.path, v.key)
+		log.Printf("request for secret %v receieved", v.key)
 		if err != nil {
 			log.Fatalf("error getting secret from vault: %s", err)
 		}
+		log.Printf("got secret %s from vault", v.key)
 		secrets[v.env] = s
 	}
 	return secrets
@@ -97,13 +100,11 @@ func writeSecrets(path, format string, secrets map[string]string) error {
 		if _, err = f.WriteString(qq); err != nil {
 			return err
 		}
+		log.Printf("written %v", len(secrets))
 	case "json":
 		return errors.New("json format is not yet setup")
 	default:
-		qq := tokeyValue(secrets)
-		if _, err = f.WriteString(qq); err != nil {
-			return err
-		}
+		return fmt.Errorf("%s is not a valid secret format", format)
 	}
 	return nil
 }
@@ -114,4 +115,8 @@ func tokeyValue(secrets map[string]string) string {
 		sl = append(sl, fmt.Sprintf("%s=%s\n", k, v))
 	}
 	return strings.Join(sl, "")
+}
+
+func toJson(secrets map[string]string) string {
+	return ""
 }
