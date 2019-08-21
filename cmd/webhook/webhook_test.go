@@ -39,43 +39,40 @@ func TestGetSecretPaths(t *testing.T) {
 			corev1.Container{
 				Env: []corev1.EnvVar{
 					corev1.EnvVar{
-						Name:  "APP_PASSWORD1",
-						Value: "vault:/secret/sql/pgpassword1",
+						Name:  "APP_PG_PASSWORD",
+						Value: "vault:/sql/dev:pgpassword1",
 					},
 					corev1.EnvVar{
-						Name:  "APP_PASSWORD2",
-						Value: "vault:/secret/sql/pgpassword2",
-					},
-					corev1.EnvVar{
-						Name:  "APP_PASSWORD3",
-						Value: "vault:/secret/sql/pgpassword3",
+						Name:  "APP_API_KEY",
+						Value: "vault:/api:mykey",
 					},
 				},
 			},
 		},
 	}
-	paths := getSecretPaths(pod)
-
-	expected := map[string]string{
-		"APP_PASSWORD1": "secret/app/password1",
-		"APP_PASSWORD2": "secret/app/password2",
-		"APP_PASSWORD3": "secret/app/password3",
+	m := getSecretPaths(pod)
+	
+	exp := []mapping{
+		mapping{
+			env: "APP_PG_PASSWORD",
+			key: "pgpassword1",
+			path: "/sql/dev",
+		},
+		mapping{
+			env: "APP_API_KEY",
+			key: "mykey",
+			path: "/api",
+		},
 	}
 
-	eq := reflect.DeepEqual(paths, expected)
+	eq := reflect.DeepEqual(m, exp)
 
 	if !eq {
-		exp := len(expected)
-		got := len(paths)
+		exp := len(exp)
+		got := len(m)
 
 		if exp != got {
-			t.Errorf("expected %d vault paths but only got %d", exp, got)
-		}
-
-		for k, v := range expected {
-			if _, ok := paths[k]; !ok {
-				t.Errorf("expected key %s to exists with value %s", k, v)
-			}
+			t.Errorf("expected %d mappings but got %d", exp, got)
 		}
 	}
 }
