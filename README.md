@@ -6,9 +6,9 @@ The plan is to support multiple file formats like key value, JSON, XML and YAML.
 
 The idea behind this project is to keep it simple as possible and let the application consume the secrets and let the developer choose whether just to source the file into environment variables or allow the application to consume the secrets as json or yaml file.
 
-There are two parts to this project.  The webhook that mutates the pod to include the init container and volume and the vault-init cli tool that gets called from the init container and pulls the secrets down.
+There are two parts to this project.  The webhook that mutates the pod to add the init container and volume.  Then the vault-init cli tool that gets called from the init container and pulls the secrets down.
 
-I will update the readme with better descriopns and instructions once I get this into a responsible state. 
+I will update the readme with better descriptions and instructions once I get this into a responsible state. 
 
 
 ## Deploying
@@ -41,7 +41,7 @@ The following environment variables configure the webhook
 * `WEBHOOK_INIT_CONTAINER_MEMORY_REQUEST`
     The Init Container Ram Requests
 
-* `WEBHOOK_INIT_CONTAINER_MEMORY_LIMITS``
+* `WEBHOOK_INIT_CONTAINER_MEMORY_LIMITS`
   The Init Container Ram Limits
 
 * `WEBHOOK_VAULT_INIT_IMAGE`
