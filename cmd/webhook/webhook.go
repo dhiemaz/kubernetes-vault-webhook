@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
@@ -25,6 +24,12 @@ var (
 	ter = promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "errors_total",
 		Help:      "the total amount of errors",
+		Namespace: "vault_webhook",
+	})
+
+	br = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "bad_requests_total",
+		Help:      "the total amount of http bad requests",
 		Namespace: "vault_webhook",
 	})
 
@@ -64,9 +69,10 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("error reading body: %s", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		ter.Inc()
+		br.Inc()
 		return
 	}
 
@@ -74,6 +80,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		log.Error("the request body is empty")
 		http.Error(w, "the request body is empty", http.StatusBadRequest)
 		ter.Inc()
+		br.Inc()
 		return
 	}
 
@@ -94,8 +101,8 @@ func serve(w http.ResponseWriter, r *http.Request) {
 
 	if request.Request == nil {
 		log.Error("no admission review in request")
+		http.Error(w, "no admission review in request", http.StatusBadRequest)
 		ter.Inc()
-		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
