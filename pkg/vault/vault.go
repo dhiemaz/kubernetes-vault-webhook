@@ -1,20 +1,18 @@
 package vault
 
 import (
-	//"io"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	http "github.com/hashicorp/go-retryablehttp"
 	"io/ioutil"
-	"log"
-	"net/http"
-	"strings"
 )
 
 type Client struct {
 	token   string
 	address string
+	http    *http.Client
 }
 
 func readJwt(path string) (string, error) {
@@ -26,71 +24,59 @@ func readJwt(path string) (string, error) {
 }
 
 func NewClient(path, address, role string) (*Client, error) {
-	c := Client{}
-	c.address = address
-
-	jwt, err := readJwt(path)
-	if err != nil {
-		log.Fatalf("could not read jwt token: %s", err)
+	h := http.NewClient()
+	c := Client{
+		address: address,
+		http:    h,
 	}
 
-	h := &http.Client{}
-	body := fmt.Sprintf(`{"role": "%s", "jwt": "%s"}`, role, jwt)
-	req, err := http.NewRequest(http.MethodPost, address+"/v1/auth/kubernetes/login", strings.NewReader(strings.TrimSpace(strings.Trim(body, "\n"))))
-
-	
-
+	j, err := readJwt(path)
 	if err != nil {
-		log.Fatalf("failed to make a request to vault: %s", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := h.Do(req)
-	if err != nil {
-		log.Fatal(err)
+		return &c, fmt.Errorf("could not read jwt token: %s", err)
 	}
 
-	// if resp.StatusCode != 200 {
-	// 	var b bytes.Buffer
-	// 	if _, err := io.Copy(&b, resp.Body); err != nil {
-	// 		log.Printf("failed to copy response body: %s", err)
-	// 	}
-	// 	return "", fmt.Errorf("failed to get successful response: %#v, %s", resp, b.String())
-	// }
-	
+	body := []byte(fmt.Sprintf(`{"role": "%s", "jwt": "%s"}`, role, j))
+	resp, err := h.Post(c.address+"/v1/auth/kubernetes/login", "application/json", body)
+	if err != nil {
+		return &c, errors.New(fmt.Sprintf("fucked %s", err))
+	}
+
 	temp := struct {
 		Auth struct {
 			Token string `json:"client_token"`
 		}
 	}{}
+
 	if err := json.NewDecoder(resp.Body).Decode(&temp); err != nil {
-		log.Fatalf("error making request to vault: %s", err)
+		return &c, fmt.Errorf("error decoding response body: %s", err)
 	}
 
 	c.token = temp.Auth.Token
-
 	if c.token == "" {
-		return &c, errors.New("error getting vault token")
+		return &c, errors.New("vault token is missing")
 	}
 	return &c, nil
 }
 
 func (c *Client) GetSecret(path, key string) (string, error) {
-	h := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, c.address+"/v1/secret/data"+path, nil)
+
+	req, err := http.NewRequest("POST", c.address+"/v1/secret/data/"+path, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to make a request to vault: %s", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Vault-Token", c.token)
-	resp, err := h.Do(req)
+
+	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to make request to vault: %s", err)
 	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read the response body: %s", err)
 	}
+
 	temp := struct {
 		Data struct {
 			Data map[string]string `json:"data"`
@@ -98,15 +84,15 @@ func (c *Client) GetSecret(path, key string) (string, error) {
 	}{}
 
 	if err := json.Unmarshal(body, &temp); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed unmarshal response body: %s", err)
 	}
+
 	if len(temp.Data.Data) < 1 {
-		return "", errors.New(fmt.Sprintf("no secret found with vault path %s", path))
+		return "", fmt.Errorf("no secrets were found with vault path: %s", path)
 	}
 
 	if _, ok := temp.Data.Data[key]; !ok {
-		return "", errors.New(fmt.Sprintf("vault path %s is valid but no key %s exist under that path", key, path))
+		return "", errors.New(fmt.Sprintf("no key found %s in vault path %s", key, path))
 	}
-
 	return temp.Data.Data[key], nil
 }
