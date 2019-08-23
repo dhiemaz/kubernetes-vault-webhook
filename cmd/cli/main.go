@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/simonmacklin/kubernetes-vault-webhook/pkg/vault"
@@ -43,8 +42,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("error parsing cmd line flags: %s", err)
 	}
-	sc := getSecrets(kv)
-	writeSecrets(path, "kv", sc)
+
+	s, err := getSecrets(kv)
+	if err != nil {
+		log.Fatalf("failed to retrieve secrets %s", err)
+	}
+
+	if err := writeSecrets(path, "kv", s); err != nil {
+		log.Fatalf("failed to write secrets to %s: %s", path, err)
+	}
 }
 
 type mapping struct {
@@ -68,41 +74,40 @@ func parseKeyValues(flags arrayFlags) ([]mapping, error) {
 	return m, nil
 }
 
-func getSecrets(m []mapping) map[string]string {
+func getSecrets(m []mapping) (map[string]string, error) {
 
 	secrets := map[string]string{}
 
 	c, err := vault.NewClient(jwt, addr, role)
 	if err != nil {
-		log.Fatalf("error getting a vault client: %s", err)
+		return secrets, fmt.Errorf("failed to connect to vault %s", err)
 	}
 	for _, v := range m {
 		s, err := c.GetSecret(v.path, v.key)
-		log.Printf("request for secret %v receieved", v.key)
 		if err != nil {
-			log.Fatalf("error getting secret from vault: %s", err)
+			return secrets, fmt.Errorf("could not retrieve secret: %s from vault: %s", v.key, err)
 		}
-		log.Printf("got secret %s from vault", v.key)
 		secrets[v.env] = s
 	}
-	return secrets
+	return secrets, nil
 }
 
 func writeSecrets(path, format string, secrets map[string]string) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	defer f.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating or opening file: %s", err)
 	}
 	switch format {
 	case "kv":
 		qq := tokeyValue(secrets)
 		if _, err = f.WriteString(qq); err != nil {
-			return err
+			return fmt.Errorf("error writting secrets to path %s : %s", path, err)
 		}
 		log.Printf("written %v", len(secrets))
+
 	case "json":
-		return errors.New("json format is not yet setup")
+
 	default:
 		return fmt.Errorf("%s is not a valid secret format", format)
 	}

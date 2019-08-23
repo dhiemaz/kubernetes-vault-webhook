@@ -51,16 +51,16 @@ func TestGetSecretPaths(t *testing.T) {
 		},
 	}
 	m := getSecretPaths(pod)
-	
+
 	exp := []mapping{
 		mapping{
-			env: "APP_PG_PASSWORD",
-			key: "pgpassword1",
+			env:  "APP_PG_PASSWORD",
+			key:  "pgpassword1",
 			path: "/sql/dev",
 		},
 		mapping{
-			env: "APP_API_KEY",
-			key: "mykey",
+			env:  "APP_API_KEY",
+			key:  "mykey",
 			path: "/api",
 		},
 	}

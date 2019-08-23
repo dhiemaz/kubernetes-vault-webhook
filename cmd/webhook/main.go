@@ -36,7 +36,6 @@ func main() {
 	stop := make(chan bool, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	flag.BoolVar(&useTLS, "UseTLS", true, "start http server with tls enabled")
 	flag.StringVar(&certPath, "CertPath", "/etc/webhook/certs/cert.pem", "path to the tls certificate")
 	flag.StringVar(&keyPath, "KeyPath", "/etc/webhook/certs/key.pem", "path to the tls private key")
 	flag.Parse()
@@ -53,17 +52,17 @@ func main() {
 	go func() {
 		log.Infof("starting http server on port %d", cfg.ServePort)
 		http.HandleFunc("/mutate", serve)
-		if useTLS {
-			log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", cfg.ServePort), certPath, keyPath, nil))
-		} else {
-			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ServePort), nil))
+		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", cfg.ServePort), certPath, keyPath, nil); err != nil {
+			log.Fatalf("webhook server has crashed: %s", err)
 		}
 	}()
 
 	go func() {
 		log.Infof("starting metrics server on port %d", cfg.MetricsPort)
 		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil); err != nil {
+			log.Fatalf("metrics server has crashed %s", err)
+		}
 	}()
 
 	go func() {
