@@ -148,3 +148,24 @@ func TestHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildInitCommand(t *testing.T) {
+	expected := []string{
+		"--secret=APP_PG_PASSWORD:/sql/dev:pgpassword1",
+		"--secret=APP_API_KEY:/app/keys:apikey",
+		"--address=http://vault:8200",
+	}
+	init := buildInitCommand([]mapping{
+		mapping{env: "APP_PG_PASSWORD", key: "pgpassword1", path: "/sql/dev"},
+		mapping{env: "APP_API_KEY", key: "apikey", path: "/app/keys"},
+	})
+
+	if len(expected) != len(init) {
+		t.Fatalf("expected the length to be %d but got %d", len(expected), len(init))
+	}
+	for i, e := range expected {
+		if e != init[i] {
+			t.Fatalf("expected string: %s but got string: %s", e, init[i])
+		}
+	}
+}
